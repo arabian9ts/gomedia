@@ -168,7 +168,7 @@ func makeTkhdBox(track *mp4track) []byte {
 	// Track_enabled: Indicates that the track is enabled. Flag value is 0x000001. A disabled track (the low bit is zero) is treated as if it were not present.
 	// Track_in_movie: Indicates that the track is used in the presentation. Flag value is 0x000002.
 	// Track_in_preview: Indicates that the track is used when previewing the presentation. Flag value is 0x000004.
-	tkhd.Box.Flags[2] = 0x07
+	tkhd.Box.Flags[2] = 0x03
 	if track.cid == MP4_CODEC_AAC || track.cid == MP4_CODEC_G711A || track.cid == MP4_CODEC_G711U || track.cid == MP4_CODEC_OPUS {
 		tkhd.Volume = 0x0100
 	} else {
@@ -176,7 +176,7 @@ func makeTkhdBox(track *mp4track) []byte {
 		tkhd.Height = track.height << 16
 	}
 
-	if track.cid == MP4_CODEC_TX3G {
+	if isSubtitle(track.cid) {
 		tkhd.Alternate_group = 3
 	}
 

@@ -467,6 +467,9 @@ func (track *mp4track) writeAAC(aacframes []byte, pts, dts uint64) (err error) {
 		return
 	}
 	// 某些情况下，aacframes 可能由多个aac帧组成需要分帧，否则quicktime 貌似播放有问题
+
+	frameDuration := uint64(1024 * 1000 / track.sampleRate) // 1024 samples per AAC frame
+
 	codec.SplitAACFrame(aacframes, func(aac []byte) {
 		entry := sampleEntry{
 			pts:                    pts,
@@ -483,6 +486,8 @@ func (track *mp4track) writeAAC(aacframes []byte, pts, dts uint64) (err error) {
 		currentOffset += int64(n)
 		entry.size = uint64(n)
 		track.addSampleEntry(entry)
+
+		dts += frameDuration
 	})
 
 	return

@@ -216,6 +216,9 @@ func (muxer *Movmuxer) WriteTrailer() (err error) {
 			if isAudio(track.cid) {
 				continue
 			}
+			if isSubtitle(track.cid) {
+				continue
+			}
 			if muxer.onNewFragment != nil {
 				muxer.onNewFragment(track.duration, track.startPts, track.startPts)
 			}
