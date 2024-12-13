@@ -1,6 +1,8 @@
 package mp4
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"io"
 
@@ -228,6 +230,7 @@ func (track *mp4track) makeStblTable() {
 			ckn++
 		}
 	}
+
 	stsz := &movstsz{
 		sampleSize:  0,
 		sampleCount: uint32(len(track.samplelist)),
@@ -290,7 +293,7 @@ func (track *mp4track) writeSample(sample []byte, pts, dts uint64) (err error) {
 	case MP4_CODEC_OPUS:
 		err = track.writeOPUS(sample, pts, dts)
 	case MP4_CODEC_TX3G:
-		err = track.writeG711(sample, pts, dts)
+		err = track.writeTx3g(sample, pts, dts)
 	}
 	return err
 }
@@ -533,6 +536,49 @@ func (track *mp4track) writeOPUS(opus []byte, pts, dts uint64) (err error) {
 	}
 
 	return track.writeG711(opus, pts, dts)
+}
+
+func writeTx3gSample(buffer *bytes.Buffer, text string) error {
+	textLength := len(text)
+	if err := binary.Write(buffer, binary.BigEndian, uint16(textLength)); err != nil {
+		return err
+	}
+
+	_, err := buffer.WriteString(text)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (track *mp4track) writeTx3g(text []byte, pts, dts uint64) (err error) {
+	var currentOffset int64
+	if currentOffset, err = track.writer.Seek(0, io.SeekCurrent); err != nil {
+		return
+	}
+
+	mdatBuffer := new(bytes.Buffer)
+	if err := writeTx3gSample(mdatBuffer, string(text)); err != nil {
+		return err
+	}
+
+	entry := sampleEntry{
+		pts:                    pts,
+		dts:                    dts,
+		size:                   0,
+		SampleDescriptionIndex: 1,
+		offset:                 uint64(currentOffset),
+	}
+
+	n := 0
+	n, err = track.writer.Write(mdatBuffer.Bytes())
+	if err != nil {
+		return
+	}
+	entry.size = uint64(n)
+	track.addSampleEntry(entry)
+	return
 }
 
 func (track *mp4track) flush() (err error) {
