@@ -9,7 +9,7 @@ func makeMinfBox(track *mp4track) []byte {
 		MP4_CODEC_MP2, MP4_CODEC_MP3, MP4_CODEC_OPUS:
 		mhdbox = makeSmhdBox()
 	case MP4_CODEC_TX3G:
-		// mhdbox = makeNmhdBox()
+		mhdbox = makeNmhdBox()
 	default:
 		panic("unsupport codec id")
 	}

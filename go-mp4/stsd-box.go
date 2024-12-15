@@ -75,7 +75,7 @@ func (entry *Tx3gSampleEntry) Size() uint64 {
 	if entry.entry.box.Size > 0 {
 		return entry.entry.box.Size
 	} else {
-		return entry.entry.Size() + 30
+		return entry.entry.Size() + 68
 	}
 }
 
@@ -99,6 +99,17 @@ func (entry *Tx3gSampleEntry) Encode() (int, []byte) {
 	}
 	copy(buf[offset:offset+12], entry.style_record[:])
 	offset += 12
+
+	ftab := NewFontTableBox()
+	_, ftabData := ftab.Encode()
+	copy(buf[offset:], ftabData)
+	offset += len(ftabData)
+
+	btrt := NewBitRateBox(0, 104, 104)
+	_, btrtData := btrt.Encode()
+	copy(buf[offset:], btrtData)
+	offset += len(btrtData)
+
 	return offset, buf
 }
 

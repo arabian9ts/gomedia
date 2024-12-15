@@ -595,6 +595,7 @@ func (track *mp4track) flush() (err error) {
 		if n, err = track.writer.Write(track.lastSample.cache); err != nil {
 			return err
 		}
+
 		entry.size = uint64(n)
 		track.addSampleEntry(entry)
 		track.lastSample.cache = track.lastSample.cache[:0]

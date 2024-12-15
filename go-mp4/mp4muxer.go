@@ -206,7 +206,6 @@ func (muxer *Movmuxer) Write(track uint32, data []byte, pts uint64, dts uint64) 
 }
 
 func (muxer *Movmuxer) WriteTrailer() (err error) {
-
 	for _, track := range muxer.tracks {
 		if err = track.flush(); err != nil {
 			return
