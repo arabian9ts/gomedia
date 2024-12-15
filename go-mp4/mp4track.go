@@ -135,6 +135,9 @@ type mp4track struct {
 	lastSeig               *SeigSampleGroupEntry
 	lastSaiz               *SaizBox
 	subSamples             []sencEntry
+
+	// current offset
+	mdatOffset uint64
 }
 
 func newmp4track(cid MP4_CODEC_TYPE, writer io.WriteSeeker) *mp4track {
@@ -278,14 +281,14 @@ func (track *mp4track) makeEmptyStblTable() {
 	track.stbltable.stss = &movstss{}
 }
 
-func (track *mp4track) writeSample(sample []byte, pts, dts uint64) (err error) {
+func (track *mp4track) writeSample(sample []byte, pts, dts uint64, currentOffset uint32) (size uint32, err error) {
 	switch track.cid {
 	case MP4_CODEC_H264:
-		err = track.writeH264(sample, pts, dts)
+		size, err = track.writeH264(sample, pts, dts, currentOffset)
 	case MP4_CODEC_H265:
 		err = track.writeH265(sample, pts, dts)
 	case MP4_CODEC_AAC:
-		err = track.writeAAC(sample, pts, dts)
+		size, err = track.writeAAC(sample, pts, dts, currentOffset)
 	case MP4_CODEC_G711A, MP4_CODEC_G711U:
 		err = track.writeG711(sample, pts, dts)
 	case MP4_CODEC_MP2, MP4_CODEC_MP3:
@@ -293,12 +296,12 @@ func (track *mp4track) writeSample(sample []byte, pts, dts uint64) (err error) {
 	case MP4_CODEC_OPUS:
 		err = track.writeOPUS(sample, pts, dts)
 	case MP4_CODEC_TX3G:
-		err = track.writeTx3g(sample, pts, dts)
+		size, err = track.writeTx3g(sample, pts, dts, currentOffset)
 	}
-	return err
+	return size, err
 }
 
-func (track *mp4track) writeH264(h264 []byte, pts, dts uint64) (err error) {
+func (track *mp4track) writeH264(h264 []byte, pts, dts uint64, currentOffset uint32) (size uint32, err error) {
 	h264extra, ok := track.extra.(*h264ExtraData)
 	if !ok {
 		panic("must init h264ExtraData first")
@@ -339,10 +342,6 @@ func (track *mp4track) writeH264(h264 []byte, pts, dts uint64) (err error) {
 		// aud/sps/pps/sei 为帧间隔
 		// 通过first_slice_in_mb来判断，改nalu是否为一帧的开头
 		if track.lastSample.hasVcl && isH264NewAccessUnit(nalu) {
-			var currentOffset int64
-			if currentOffset, err = track.writer.Seek(0, io.SeekCurrent); err != nil {
-				return false
-			}
 			entry := sampleEntry{
 				pts:                    track.lastSample.pts,
 				dts:                    track.lastSample.dts,
@@ -355,6 +354,7 @@ func (track *mp4track) writeH264(h264 []byte, pts, dts uint64) (err error) {
 			if n, err = track.writer.Write(track.lastSample.cache); err != nil {
 				return false
 			}
+			currentOffset += uint32(n)
 			entry.size = uint64(n)
 			track.addSampleEntry(entry)
 			track.lastSample.cache = track.lastSample.cache[:0]
@@ -372,7 +372,7 @@ func (track *mp4track) writeH264(h264 []byte, pts, dts uint64) (err error) {
 		track.lastSample.cache = append(track.lastSample.cache, codec.ConvertAnnexBToAVCC(nalu)...)
 		return true
 	})
-	return
+	return currentOffset, nil
 }
 
 func (track *mp4track) writeH265(h265 []byte, pts, dts uint64) (err error) {
@@ -437,15 +437,15 @@ func (track *mp4track) writeH265(h265 []byte, pts, dts uint64) (err error) {
 	return
 }
 
-func (track *mp4track) writeAAC(aacframes []byte, pts, dts uint64) (err error) {
+func (track *mp4track) writeAAC(aacframes []byte, pts, dts uint64, currentOffset uint32) (size uint32, err error) {
 	aacextra, ok := track.extra.(*aacExtraData)
 	if !ok {
-		return errors.New("must init aacExtraData first")
+		return 0, errors.New("must init aacExtraData first")
 	}
 	if aacextra.asc == nil || len(aacextra.asc) <= 0 {
 		asc, err := codec.ConvertADTSToASC(aacframes)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		aacextra.asc = asc.Encode()
 
@@ -462,10 +462,6 @@ func (track *mp4track) writeAAC(aacframes []byte, pts, dts uint64) (err error) {
 		}
 	}
 
-	var currentOffset int64
-	if currentOffset, err = track.writer.Seek(0, io.SeekCurrent); err != nil {
-		return
-	}
 	// 某些情况下，aacframes 可能由多个aac帧组成需要分帧，否则quicktime 貌似播放有问题
 
 	frameDuration := uint64(1024 * 1000 / track.sampleRate) // 1024 samples per AAC frame
@@ -483,14 +479,14 @@ func (track *mp4track) writeAAC(aacframes []byte, pts, dts uint64) (err error) {
 		if err != nil {
 			return
 		}
-		currentOffset += int64(n)
+		currentOffset += uint32(n)
 		entry.size = uint64(n)
 		track.addSampleEntry(entry)
 
 		dts += frameDuration
 	})
 
-	return
+	return currentOffset, nil
 }
 
 func (track *mp4track) writeG711(g711 []byte, pts, dts uint64) (err error) {
@@ -557,15 +553,10 @@ func writeTx3gSample(buffer *bytes.Buffer, text string) error {
 	return nil
 }
 
-func (track *mp4track) writeTx3g(text []byte, pts, dts uint64) (err error) {
-	var currentOffset int64
-	if currentOffset, err = track.writer.Seek(0, io.SeekCurrent); err != nil {
-		return
-	}
-
+func (track *mp4track) writeTx3g(text []byte, pts, dts uint64, currentOffset uint32) (size uint32, err error) {
 	mdatBuffer := new(bytes.Buffer)
 	if err := writeTx3gSample(mdatBuffer, string(text)); err != nil {
-		return err
+		return 0, err
 	}
 
 	entry := sampleEntry{
@@ -583,7 +574,7 @@ func (track *mp4track) writeTx3g(text []byte, pts, dts uint64) (err error) {
 	}
 	entry.size = uint64(n)
 	track.addSampleEntry(entry)
-	return
+	return currentOffset + uint32(n), nil
 }
 
 func (track *mp4track) flush() (err error) {

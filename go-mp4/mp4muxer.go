@@ -37,6 +37,8 @@ type Movmuxer struct {
 	movFlag        MP4_FLAG
 	onNewFragment  OnFragment
 	fragDuration   uint32
+
+	mdatCurrentOffset uint32
 }
 
 type MuxerOption func(muxer *Movmuxer)
@@ -70,28 +72,33 @@ func CreateMp4Muxer(w io.WriteSeeker, options ...MuxerOption) (*Movmuxer, error)
 		ftyp.Compatible_brands[2] = mov_tag(avc1)
 		ftyp.Compatible_brands[3] = mov_tag(mp41)
 		length, boxdata := ftyp.Encode()
-		_, err := muxer.writer.Write(boxdata[0:length])
+
+		var currentOffset uint64
+		size, err := muxer.writer.Write(boxdata[0:length])
 		if err != nil {
 			return nil, err
 		}
+		currentOffset += uint64(size)
+
 		free := NewFreeBox()
 		freelen, freeboxdata := free.Encode()
-		_, err = muxer.writer.Write(freeboxdata[0:freelen])
+		size, err = muxer.writer.Write(freeboxdata[0:freelen])
 		if err != nil {
 			return nil, err
 		}
-		currentOffset, err := muxer.writer.Seek(0, io.SeekCurrent)
-		if err != nil {
-			return nil, err
-		}
+		currentOffset += uint64(size)
+
 		muxer.mdatOffset = uint32(currentOffset)
 		mdat := BasicBox{Type: [4]byte{'m', 'd', 'a', 't'}}
 		mdat.Size = 8
 		mdatlen, mdatBox := mdat.Encode()
-		_, err = muxer.writer.Write(mdatBox[0:mdatlen])
+		size, err = muxer.writer.Write(mdatBox[0:mdatlen])
 		if err != nil {
 			return nil, err
 		}
+		currentOffset += uint64(size)
+
+		muxer.mdatCurrentOffset = uint32(currentOffset)
 	}
 	return muxer, nil
 }
@@ -167,10 +174,11 @@ func (muxer *Movmuxer) addTrack(cid MP4_CODEC_TYPE, options ...TrackOption) uint
 
 func (muxer *Movmuxer) Write(track uint32, data []byte, pts uint64, dts uint64) error {
 	mp4track := muxer.tracks[track]
-	err := mp4track.writeSample(data, pts, dts)
+	offset, err := mp4track.writeSample(data, pts, dts, muxer.mdatCurrentOffset)
 	if err != nil {
 		return err
 	}
+	muxer.mdatCurrentOffset = offset
 
 	if !muxer.movFlag.isFragment() && !muxer.movFlag.isDash() {
 		return err
