@@ -142,15 +142,7 @@ func WithExtraData(extraData []byte) TrackOption {
 	}
 }
 
-func (muxer *Movmuxer) AddAudioTrack(cid MP4_CODEC_TYPE, options ...TrackOption) uint32 {
-	return muxer.addTrack(cid, options...)
-}
-
-func (muxer *Movmuxer) AddVideoTrack(cid MP4_CODEC_TYPE, options ...TrackOption) uint32 {
-	return muxer.addTrack(cid, options...)
-}
-
-func (muxer *Movmuxer) AddTx3gTrack(cid MP4_CODEC_TYPE, options ...TrackOption) uint32 {
+func (muxer *Movmuxer) AddTrack(cid MP4_CODEC_TYPE, options ...TrackOption) uint32 {
 	return muxer.addTrack(cid, options...)
 }
 

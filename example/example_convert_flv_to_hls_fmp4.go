@@ -91,8 +91,8 @@ func generateM3U8(flvFile string) {
 		}
 		muxer.ReBindWriter(mp4file)
 	})
-	vtid = muxer.AddVideoTrack(mp4.MP4_CODEC_H264)
-	atid = muxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
+	vtid = muxer.AddTrack(mp4.MP4_CODEC_H264)
+	atid = muxer.AddTrack(mp4.MP4_CODEC_AAC)
 
 	flvfilereader, _ := os.Open(flvFile)
 	defer flvfilereader.Close()
@@ -160,7 +160,7 @@ func onHLSVod(w http.ResponseWriter, r *http.Request) {
 	w.Write(buf.Bytes())
 }
 
-//http://127.0.0.1:19999/vod/test.m3u8
+// http://127.0.0.1:19999/vod/test.m3u8
 func main() {
 	generateM3U8(os.Args[1])
 

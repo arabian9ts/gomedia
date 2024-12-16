@@ -90,8 +90,8 @@ func generateH265M3U8(f string) {
 		}
 		muxer.ReBindWriter(mp4file)
 	})
-	vtid = muxer.AddVideoTrack(mp4.MP4_CODEC_H265)
-	atid = muxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
+	vtid = muxer.AddTrack(mp4.MP4_CODEC_H265)
+	atid = muxer.AddTrack(mp4.MP4_CODEC_AAC)
 
 	mp4fileReader, _ := os.Open(f)
 	defer mp4fileReader.Close()
@@ -156,7 +156,7 @@ func onH265HLSVod(w http.ResponseWriter, r *http.Request) {
 	w.Write(buf.Bytes())
 }
 
-//http://127.0.0.1:19999/vod/test.m3u8
+// http://127.0.0.1:19999/vod/test.m3u8
 func main() {
 	generateH265M3U8(os.Args[1])
 	mux := http.NewServeMux()

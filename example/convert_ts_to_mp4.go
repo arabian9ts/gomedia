@@ -40,7 +40,7 @@ func main() {
 	demuxer.OnFrame = func(cid mpeg2.TS_STREAM_TYPE, frame []byte, pts uint64, dts uint64) {
 		if cid == mpeg2.TS_STREAM_H264 {
 			if !hasVideo {
-				vtid = muxer.AddVideoTrack(mp4.MP4_CODEC_H264)
+				vtid = muxer.AddTrack(mp4.MP4_CODEC_H264)
 				hasVideo = true
 			}
 			err = muxer.Write(vtid, frame, uint64(pts), uint64(dts))
@@ -49,7 +49,7 @@ func main() {
 			}
 		} else if cid == mpeg2.TS_STREAM_AAC {
 			if !hasAudio {
-				atid = muxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
+				atid = muxer.AddTrack(mp4.MP4_CODEC_AAC)
 				hasAudio = true
 			}
 			err = muxer.Write(atid, frame, uint64(pts), uint64(dts))
@@ -58,7 +58,7 @@ func main() {
 			}
 		} else if cid == mpeg2.TS_STREAM_AUDIO_MPEG1 || cid == mpeg2.TS_STREAM_AUDIO_MPEG2 {
 			if !hasAudio {
-				atid = muxer.AddAudioTrack(mp4.MP4_CODEC_MP3)
+				atid = muxer.AddTrack(mp4.MP4_CODEC_MP3)
 				hasAudio = true
 			}
 			err = muxer.Write(atid, frame, uint64(pts), uint64(dts))
